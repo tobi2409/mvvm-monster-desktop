@@ -1,7 +1,5 @@
 # MVVM Monster Desktop
 
-Anmerkung und TODO: Das ist interessehalber gevibecodet und noch nicht von mir überprüft worden.
-
 Eine native Desktop-Anwendung mit Node.js und [NodeGui](https://docs.nodegui.org/).
 
 ## Voraussetzungen
