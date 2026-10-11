@@ -1,82 +1,114 @@
-const { QMainWindow } = require("@nodegui/nodegui");
-const { createQtDocument } = require("./dom");
+const { QMainWindow } = require("@nodegui/nodegui")
+const { createQtDocument } = require("./dom")
 
 function createElement(document, tagName, attributes = {}, ...children) {
-  const element = document.createElement(tagName);
-  for (const [name, value] of Object.entries(attributes)) {
-    element.setAttribute(name, value);
-  }
-  element.append(...children.flat());
-  return element;
+    const element = document.createElement(tagName)
+    for (const [name, value] of Object.entries(attributes)) {
+        element.setAttribute(name, value)
+    }
+    element.append(...children.flat())
+    return element
 }
 
 async function main() {
-  const window = new QMainWindow();
-  window.setWindowTitle("MVVM Monster Desktop");
-  window.resize(720, 560);
+    const window = new QMainWindow()
+    window.setWindowTitle("MVVM Monster Desktop")
+    window.resize(720, 560)
 
-  const document = createQtDocument().installGlobals();
-  const { default: TemplateEngine } = await import("@tobi2409/mvvm-monster");
-  const element = (tagName, attributes, ...children) => createElement(document, tagName, attributes, ...children);
+    const document = createQtDocument().installGlobals()
+    const { default: TemplateEngine } = await import("@tobi2409/mvvm-monster")
+    const element = (tagName, attributes, ...children) =>
+        createElement(document, tagName, attributes, ...children)
 
-  const root = document.body;
-  root.id = "root";
+    const root = document.body
+    root.id = "root"
 
-  const template = element("template", { id: "task-template" },
-    element("span", { id: "eyebrow" }, "MVVM MONSTER + NODEGUI"),
-    element("h1", { id: "title" }, element("get", {}, "heading")),
-    element("p", { id: "subtitle" }, element("get", {}, "subtitle")),
-    element("form", { id: "form" },
-      element("input", {
-        id: "taskInput",
-        placeholder: "Was möchtest du erledigen?",
-        "bind-input-value": "draft",
-      }),
-      element("button", { id: "addButton", "action-click": "addTask" }, "Hinzufügen"),
-    ),
-    element("if", { test: "showStatus", wrapper: "section" },
-      element("output", { id: "status" }, element("get", {}, "status")),
-    ),
-    element("section", { id: "tasks" },
-      element("each", { of: "tasks", as: "task" },
-        element("div", { class: "task-row" },
-          element("span", { class: "task-index" }, element("get", {}, "task.position")),
-          element("span", { class: "task-title" }, element("get", {}, "task.title")),
+    const template = element(
+        "template",
+        { id: "task-template" },
+        element("span", { id: "eyebrow" }, "MVVM MONSTER + NODEGUI"),
+        element("h1", { id: "title" }, element("get", {}, "heading")),
+        element("p", { id: "subtitle" }, element("get", {}, "subtitle")),
+        element(
+            "form",
+            { id: "form" },
+            element("input", {
+                id: "taskInput",
+                placeholder: "Was möchtest du erledigen?",
+                "bind-input-value": "draft",
+            }),
+            element(
+                "button",
+                { id: "addButton", "action-click": "addTask" },
+                "Hinzufügen",
+            ),
         ),
-      ),
-    ),
-  );
+        element(
+            "if",
+            { test: "showStatus", wrapper: "section" },
+            element("output", { id: "status" }, element("get", {}, "status")),
+        ),
+        element(
+            "section",
+            { id: "tasks" },
+            element(
+                "each",
+                { of: "tasks", as: "task" },
+                element(
+                    "div",
+                    { class: "task-row" },
+                    element(
+                        "span",
+                        { class: "task-index" },
+                        element("get", {}, "task.position"),
+                    ),
+                    element(
+                        "span",
+                        { class: "task-title" },
+                        element("get", {}, "task.title"),
+                    ),
+                ),
+            ),
+        ),
+    )
 
-  const templateUse = element("template-use", {
-    "template-id": "task-template",
-    "mount-id": "root",
-  });
+    const templateUse = element("template-use", {
+        "template-id": "task-template",
+        "mount-id": "root",
+    })
 
-  root.append(template);
+    root.append(template)
 
-  const viewModel = TemplateEngine.reactive({
-    heading: "Heute im Blick",
-    subtitle: "Die Oberfläche wird deklarativ durch mvvm-monster gerendert.",
-    draft: "",
-    showStatus: false,
-    status: "",
-    tasks: [
-      { position: "01", title: "Qt-DOM aufbauen" },
-      { position: "02", title: "MVVM-Tags rendern" },
-    ],
-    addTask: (_event, data) => {
-      const title = data.draft.trim();
-      if (!title) return;
-      data.tasks.push({ position: String(data.tasks.length + 1).padStart(2, "0"), title });
-      data.status = `Erfasst: ${title}`;
-      data.showStatus = true;
-      data.draft = "";
-      document.getElementById("taskInput").focus();
-    },
-  }, templateUse);
+    const viewModel = TemplateEngine.reactive(
+        {
+            heading: "Heute im Blick",
+            subtitle:
+                "Die Oberfläche wird deklarativ durch mvvm-monster gerendert.",
+            draft: "",
+            showStatus: false,
+            status: "",
+            tasks: [
+                { position: "01", title: "Qt-DOM aufbauen" },
+                { position: "02", title: "MVVM-Tags rendern" },
+            ],
+            addTask: (_event, data) => {
+                const title = data.draft.trim()
+                if (!title) return
+                data.tasks.push({
+                    position: String(data.tasks.length + 1).padStart(2, "0"),
+                    title,
+                })
+                data.status = `Erfasst: ${title}`
+                data.showStatus = true
+                data.draft = ""
+                document.getElementById("taskInput").focus()
+            },
+        },
+        templateUse,
+    )
 
-  document.mount(window);
-  document.setStyleSheet(`
+    document.mount(window)
+    document.setStyleSheet(`
   #root {
     background-color: #f4f1e8;
     flex: 1;
@@ -174,22 +206,25 @@ async function main() {
     flex: 1;
     font-size: 14px;
   }
-`);
+`)
 
-  window.show();
-  global.mainWindow = window;
-  global.viewModel = viewModel;
+    window.show()
+    global.mainWindow = window
+    global.viewModel = viewModel
 
-  setTimeout(() => {
-    viewModel.heading = "Reaktiv verbunden";
-    viewModel.tasks[0].title = "Qt-DOM steht";
-    viewModel.tasks.push({ position: "03", title: "Variablen nach DOM-Aufbau geändert" });
-    viewModel.status = "Das ViewModel hat den nativen Qt-DOM aktualisiert.";
-    viewModel.showStatus = true;
-  }, 3000);
+    setTimeout(() => {
+        viewModel.heading = "Reaktiv verbunden"
+        viewModel.tasks[0].title = "Qt-DOM steht"
+        viewModel.tasks.push({
+            position: "03",
+            title: "Variablen nach DOM-Aufbau geändert",
+        })
+        viewModel.status = "Das ViewModel hat den nativen Qt-DOM aktualisiert."
+        viewModel.showStatus = true
+    }, 3000)
 }
 
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+    console.error(error)
+    process.exitCode = 1
+})
