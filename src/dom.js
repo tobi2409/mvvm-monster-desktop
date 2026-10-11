@@ -14,8 +14,8 @@ function parseSimpleSelector(selector) {
         tagName: selector.match(/^[a-zA-Z][\w-]*/)?.[0]?.toLowerCase(),
         id: selector.match(/#([\w-]+)/)?.[1],
         classNames: [...selector.matchAll(/\.([\w-]+)/g)].map(
-            (match) => match[1],
-        ),
+            (match) => match[1]
+        )
     }
 }
 
@@ -64,6 +64,8 @@ class Node extends EventTarget {
         this.ownerDocument = ownerDocument
         this.parentNode = null
         this.childNodes = []
+        this.qt = null
+        this._renderBinding = null
     }
 
     get firstChild() {
@@ -80,12 +82,12 @@ class Node extends EventTarget {
 
     appendChild(node) {
         if (!(node instanceof Node)) {
-            throw new TypeError("appendChild erwartet einen Node")
+            throw new TypeError('appendChild erwartet einen Node')
         }
 
         if (node === this || node.contains(this)) {
             throw new Error(
-                "Ein Node kann nicht in sich selbst eingefügt werden",
+                'Ein Node kann nicht in sich selbst eingefügt werden'
             )
         }
 
@@ -102,6 +104,12 @@ class Node extends EventTarget {
         node.parentNode = this
 
         this.childNodes.push(node)
+        this._notify({
+            addedNodes: [node],
+            nextSibling: null,
+            removedNodes: []
+        })
+
         return node
     }
 
@@ -110,7 +118,7 @@ class Node extends EventTarget {
             this.appendChild(
                 node instanceof Node
                     ? node
-                    : this.ownerDocument.createTextNode(node),
+                    : this.ownerDocument.createTextNode(node)
             )
         }
     }
@@ -121,8 +129,9 @@ class Node extends EventTarget {
         }
 
         const referenceIndex = this.childNodes.indexOf(referenceNode)
+
         if (referenceIndex === -1) {
-            throw new Error("Der Referenz-Node ist kein Kind dieses Nodes")
+            throw new Error('Der Referenz-Node ist kein Kind dieses Nodes')
         }
 
         if (node.nodeType === DOCUMENT_FRAGMENT_NODE) {
@@ -136,6 +145,12 @@ class Node extends EventTarget {
         node.remove()
         node.parentNode = this
         this.childNodes.splice(referenceIndex, 0, node)
+        this._notify({
+            addedNodes: [node],
+            nextSibling: referenceNode,
+            removedNodes: []
+        })
+
         return node
     }
 
@@ -143,11 +158,17 @@ class Node extends EventTarget {
         const index = this.childNodes.indexOf(node)
 
         if (index === -1) {
-            throw new Error("Der Node ist kein Kind dieses Nodes")
+            throw new Error('Der Node ist kein Kind dieses Nodes')
         }
 
         this.childNodes.splice(index, 1)
         node.parentNode = null
+        this._notify({
+            addedNodes: [],
+            nextSibling: this.childNodes[index] ?? null,
+            removedNodes: [node]
+        })
+
         return node
     }
 
@@ -168,11 +189,34 @@ class Node extends EventTarget {
     }
 
     get textContent() {
-        return this.childNodes.map((child) => child.textContent).join("")
+        return this.childNodes.map((child) => child.textContent).join('')
     }
 
     set textContent(value) {
         this.replaceChildren(String(value))
+    }
+
+    _notify(record) {
+        this._updateRenderBinding({
+            target: this,
+            type: 'childList',
+            ...record
+        })
+    }
+
+    // Die Render-Bindung verbindet einen DOM-Knoten mit seinem Qt-Widget und
+    // leitet DOM-Änderungen an die RenderEngine weiter. Nicht jeder Knoten hat
+    // eine eigene Bindung: Textknoten innerhalb eines atomar gerenderten
+    // Elements werden etwa vom Widget ihres Elternelements dargestellt.
+    // Deshalb wird die Elternkette bis zur nächsten Bindung durchlaufen.
+    _updateRenderBinding(change) {
+        let node = this
+
+        while (node && !node._renderBinding) {
+            node = node.parentNode
+        }
+
+        node?._renderBinding.update(change)
     }
 }
 
@@ -181,7 +225,7 @@ Object.assign(Node, {
     DOCUMENT_FRAGMENT_NODE,
     DOCUMENT_NODE,
     ELEMENT_NODE,
-    TEXT_NODE,
+    TEXT_NODE
 })
 
 class Text extends Node {
@@ -196,6 +240,11 @@ class Text extends Node {
 
     set textContent(value) {
         this.data = String(value)
+
+        this._updateRenderBinding({
+            target: this,
+            type: 'characterData'
+        })
     }
 
     cloneNode() {
@@ -216,7 +265,9 @@ class DocumentFragment extends Node {
         const clone = new DocumentFragment(this.ownerDocument)
 
         if (deep) {
-            clone.append(...this.childNodes.map((child) => child.cloneNode(true)))
+            clone.append(
+                ...this.childNodes.map((child) => child.cloneNode(true))
+            )
         }
 
         return clone
@@ -272,7 +323,7 @@ class DOMTokenList {
     add(...tokens) {
         const values = new Set(this._values())
         tokens.forEach((token) => values.add(String(token)))
-        this.element.className = [...values].join(" ")
+        this.element.className = [...values].join(' ')
     }
 
     contains(token) {
@@ -296,7 +347,24 @@ class Element extends Node {
         this.attributes = new NamedNodeMap()
         this.classList = new DOMTokenList(this)
         this.dataset = {}
-        this.style = {}
+
+        // Der Proxy macht direkte Änderungen wie style.display = 'none'
+        // beobachtbar, obwohl style weiterhin wie ein normales Objekt nutzbar ist.
+        this.style = new Proxy(
+            {},
+            {
+                deleteProperty: (target, name) => {
+                    delete target[name]
+                    this._notifyAttribute(`style.${String(name)}`)
+                    return true
+                },
+                set: (target, name, value) => {
+                    target[name] = value
+                    this._notifyAttribute(`style.${String(name)}`)
+                    return true
+                }
+            }
+        )
     }
 
     get children() {
@@ -304,23 +372,25 @@ class Element extends Node {
     }
 
     get id() {
-        return this.getAttribute("id") ?? ""
+        return this.getAttribute('id') ?? ''
     }
 
     set id(value) {
-        this.setAttribute("id", value)
+        this.setAttribute('id', value)
     }
 
     get className() {
-        return this.getAttribute("class") ?? ""
+        return this.getAttribute('class') ?? ''
     }
 
     set className(value) {
-        this.setAttribute("class", value)
+        this.setAttribute('class', value)
     }
 
     setAttribute(name, value) {
-        this.attributes.set(String(name).toLowerCase(), String(value))
+        const normalizedName = String(name).toLowerCase()
+        this.attributes.set(normalizedName, String(value))
+        this._notifyAttribute(normalizedName)
     }
 
     getAttribute(name) {
@@ -332,7 +402,17 @@ class Element extends Node {
     }
 
     removeAttribute(name) {
-        this.attributes.delete(String(name).toLowerCase())
+        const normalizedName = String(name).toLowerCase()
+        this.attributes.delete(normalizedName)
+        this._notifyAttribute(normalizedName)
+    }
+
+    _notifyAttribute(attributeName) {
+        this._updateRenderBinding({
+            attributeName,
+            target: this,
+            type: 'attributes'
+        })
     }
 
     cloneNode(deep = false) {
@@ -345,7 +425,9 @@ class Element extends Node {
         Object.assign(clone.style, this.style)
 
         if (deep) {
-            clone.append(...this.childNodes.map((child) => child.cloneNode(true)))
+            clone.append(
+                ...this.childNodes.map((child) => child.cloneNode(true))
+            )
         }
 
         return clone
@@ -353,7 +435,7 @@ class Element extends Node {
 
     matches(selector) {
         return selector
-            .split(",")
+            .split(',')
             .some((part) => matchesSelector(this, part.trim()))
     }
 
@@ -363,7 +445,7 @@ class Element extends Node {
 
     querySelectorAll(selector) {
         return descendantsOf(this).filter(
-            (node) => node instanceof Element && node.matches(selector),
+            (node) => node instanceof Element && node.matches(selector)
         )
     }
 }
@@ -372,7 +454,7 @@ class HTMLElement extends Element {}
 
 class HTMLTemplateElement extends HTMLElement {
     constructor(ownerDocument) {
-        super("template", ownerDocument)
+        super('template', ownerDocument)
         this.content = new DocumentFragment(ownerDocument)
     }
 
@@ -392,7 +474,9 @@ class HTMLTemplateElement extends HTMLElement {
         const clone = super.cloneNode(false)
         if (deep) {
             clone.content.append(
-                ...this.content.childNodes.map((child) => child.cloneNode(true)),
+                ...this.content.childNodes.map((child) =>
+                    child.cloneNode(true)
+                )
             )
         }
         return clone
@@ -403,17 +487,17 @@ class Document extends Node {
     constructor() {
         super(DOCUMENT_NODE)
         this.ownerDocument = this
-        this.documentElement = this.createElement("html")
-        this.body = this.createElement("body")
+        this.documentElement = this.createElement('html')
+        this.body = this.createElement('body')
         this.documentElement.appendChild(this.body)
         this.appendChild(this.documentElement)
     }
 
     createElement(tagName) {
-        if (String(tagName).toLowerCase() === "template") {
+        if (String(tagName).toLowerCase() === 'template') {
             return new HTMLTemplateElement(this)
         }
-        
+
         return new HTMLElement(tagName, this)
     }
 
@@ -434,8 +518,8 @@ class Document extends Node {
 
         return this._elements().filter(
             (element) =>
-                normalizedTagName === "*" ||
-                element.localName === normalizedTagName,
+                normalizedTagName === '*' ||
+                element.localName === normalizedTagName
         )
     }
 
@@ -443,7 +527,7 @@ class Document extends Node {
         const classNames = String(className).split(/\s+/).filter(Boolean)
 
         return this._elements().filter((element) =>
-            classNames.every((name) => element.classList.includes(name)),
+            classNames.every((name) => element.classList.includes(name))
         )
     }
 
@@ -477,5 +561,5 @@ module.exports = {
     HTMLElement,
     NamedNodeMap,
     Node,
-    Text,
+    Text
 }

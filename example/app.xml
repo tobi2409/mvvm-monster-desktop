@@ -1,0 +1,28 @@
+<application>
+    <template id="dashboard-template">
+        <label class="title"><get>title</get></label>
+        <label>Angemeldet als <get>user.name</get></label>
+
+        <if test="showNotice" wrapper="section">
+            <label class="notice"><get>notice</get></label>
+        </if>
+
+        <section class="tasks">
+            <each of="tasks" as="task">
+                <article class="task">
+                    <label class="position"><get>task.position</get></label>
+                    <label class="task-title"><get>task.title</get></label>
+                </article>
+            </each>
+        </section>
+
+        <section class="task-form">
+            <input id="new-task" placeholder="Neue Aufgabe" />
+            <button desktop-action="addTask">Hinzufügen</button>
+        </section>
+    </template>
+
+    <main id="app" />
+    
+    <template-use template-id="dashboard-template" mount-id="app" />
+</application>

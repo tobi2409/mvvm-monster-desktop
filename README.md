@@ -25,48 +25,69 @@ npm test
 
 ## MVVM Monster
 
-Die Oberfläche in `src/index.js` wird als programmatisches `<template>` mit
-`<get>`, `<each>` und `<if>` aufgebaut. `TemplateEngine.reactive(...)` rendert
-dieses Template in den Qt-DOM. Bindings und Aktionen verwenden dieselben
-Attribute wie im Browser:
+Das ausführbare Beispiel liegt getrennt vom wiederverwendbaren Code:
 
-```javascript
-input.setAttribute("bind-input-value", "draft");
-button.setAttribute("action-click", "addTask");
+```text
+example/
+	app.xml
+	index.js
+	style.qss
+src/
+	dom.js
+	render.js
+	xml.js
 ```
 
-Änderungen am zurückgegebenen ViewModel aktualisieren die nativen Widgets:
+`example/app.xml` beschreibt die Oberfläche mit normalen Elementen sowie
+`<get>`, `<each>` und `<if>`. `src/xml.js` validiert und parst das Layout. Dabei
+wird jeder Text- und Elementknoten erzeugt und rekursiv mit `appendChild` in den
+DOM eingefügt. Anschließend verarbeitet `TemplateEngine.reactive(...)` das
+Template.
 
-```javascript
-viewModel.heading = "Reaktiv verbunden";
-viewModel.tasks.push({ position: "03", title: "Neue Aufgabe" });
-viewModel.showStatus = true;
+```xml
+<application>
+	<template id="dashboard-template">
+		<h1><get>title</get></h1>
+	</template>
+	<main id="app" />
+	<template-use template-id="dashboard-template" mount-id="app" />
+</application>
 ```
 
-## Qt-DOM
-
-`src/dom.js` bildet eine Browser-ähnliche API auf native Qt-Widgets ab:
+`src/render.js` verbindet beim Mounten jeden DOM-Knoten direkt mit seinem
+NodeGui-Widget. Die native Instanz ist anschließend über `node.qt` erreichbar.
+Spätere DOM-Änderungen aktualisieren dieses Widget oder Layout unmittelbar und
+benötigen keinen zusätzlichen Renderaufruf:
 
 ```javascript
-const { createQtDocument } = require("./dom");
+viewModel.title = 'Reaktives Dashboard'
+viewModel.tasks.push({ position: 3, title: 'Neue Aufgabe' })
+viewModel.showNotice = true
+```
 
-const document = createQtDocument();
-const button = document.createElement("button");
+## DOM
 
-button.id = "save";
-button.classList.add("primary");
-button.textContent = "Speichern";
-button.addEventListener("click", () => console.log("Gespeichert"));
-document.body.append(button);
-document.mount(window);
+`src/dom.js` stellt eine kleine, plattformunabhängige Browser-ähnliche API für
+`mvvm-monster` bereit. Der XML-Parser kann so ohne NodeGui-Abhängigkeit getestet
+und wiederverwendet werden.
+
+```javascript
+const { Document } = require('./src/dom')
+const { appendXml } = require('./src/xml')
+
+const document = new Document()
+appendXml(
+    document,
+    document.body,
+    '<application><main id="app" /></application>',
+)
 ```
 
 Unterstützt werden unter anderem `createElement`, `createTextNode`, `append`,
 `appendChild`, `insertBefore`, `remove`, `replaceChildren`, `getElementById`,
-`querySelector(All)`, `getElementsByTagName`, `getElementsByClassName`,
-`closest`, Attribute, `classList`, `style` und Events. Die native NodeGui-Instanz
-ist über `element.qt` verfügbar.
+`querySelector(All)`, `getElementsByTagName`, `getElementsByClassName`, Attribute,
+`classList` und `style`.
 
 Das Modul ist kein vollständiger WHATWG-DOM: HTML-Parsing, CSS-Kaskade,
 Live-Collections, Browser-Navigation und Web-APIs wie Canvas oder Fetch werden
-nicht emuliert. Layout und Darstellung erfolgen nativ durch Qt.
+nicht emuliert.

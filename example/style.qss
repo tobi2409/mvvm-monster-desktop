@@ -1,0 +1,56 @@
+#app {
+    background-color: #f4f1e8;
+    padding: 36px;
+}
+
+QLabel[class="title"] {
+    color: #17201d;
+    font-size: 30px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+QLabel[class="notice"] {
+    background-color: #e2e9dc;
+    color: #25332e;
+    padding: 12px;
+    margin: 12px 0;
+}
+
+QWidget[class="tasks"] {
+    margin-top: 16px;
+}
+
+QWidget[class="task-form"] {
+    flex-direction: row;
+    margin-top: 16px;
+}
+
+QLineEdit {
+    min-height: 40px;
+    margin-right: 8px;
+}
+
+QPushButton {
+    min-height: 40px;
+    min-width: 120px;
+}
+
+QWidget[class="task"] {
+    background-color: #ffffff;
+    border-bottom: 1px solid #d8dcd7;
+    flex-direction: row;
+    min-height: 48px;
+    padding: 12px;
+}
+
+QWidget[class="task"] QLabel[class="position"] {
+    color: #b6402c;
+    font-weight: bold;
+    min-width: 36px;
+}
+
+QWidget[class="task"] QLabel[class="task-title"] {
+    color: #25332e;
+    font-size: 15px;
+}
