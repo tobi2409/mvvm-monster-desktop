@@ -1,0 +1,23 @@
+{
+  "name": "mvvm-monster-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eine native Desktop-Anwendung mit Node.js und NodeGui",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "qode src/index.js",
+    "check": "node --check src/dom.js && node --check src/index.js && node --check test/dom.test.js",
+    "test": "QT_QPA_PLATFORM=offscreen qode test/dom.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@nodegui/nodegui": "^0.74.2",
+    "@tobi2409/mvvm-monster": "^0.9.16"
+  },
+  "allowScripts": {
+    "@nodegui/nodegui@0.74.2": true,
+    "@nodegui/qode@24.12.0-rc19": true
+  }
+}
